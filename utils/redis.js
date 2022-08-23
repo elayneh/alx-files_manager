@@ -1,51 +1,66 @@
-import { createClient } from "redis";
-import { promisify } from "redis";
+import mongodb from "mongodb";
+// eslint-disable-next-line no-unused-vars
+import Collection from "mongodb/lib/collection";
+import envLoader from "./env_loader";
 
-class RedisClient {
+/**
+ * Represents a MongoDB client.
+ */
+class DBClient {
+    /**
+     * Creates a new DBClient instance.
+     */
     constructor() {
-        this.client = createClient();
-        this.isClientConnected = true;
-        this.client.on("error", (err) => {
-            console.error("Redis client error: ", err);
-            this.isClientConnected = false;
-        });
-        this.client.on("connect", () => {
-            thsi.isClientConnected = true;
-        });
+        envLoader();
+        const host = process.env.DB_HOST || "localhost";
+        const port = process.env.DB_PORT || 27017;
+        const database = process.env.DB_DATABASE || "files_manager";
+        const dbURL = `mongodb://${host}:${port}/${database}`;
+
+        this.client = new mongodb.MongoClient(dbURL, { useUnifiedTopology: true });
+        this.client.connect();
     }
 
     /**
-     * checks if the connected client is active
+     * Checks if this client's connection to the MongoDB server is active.
+     * @returns {boolean}
      */
     isAlive() {
-        return this.isClientConnected;
+        return this.client.isConnected();
     }
 
     /**
-     *
-     * @param {key} key To search for the value
-     * @returns The value that associate with the given key
+     * Retrieves the number of users in the database.
+     * @returns {Promise<Number>}
      */
-    async get(key) {
-            return promisify(this.client.GET).bind(this.client)(key);
-        }
-        /**
-         * Set the the given value associating with the given key
-         * @param {*} key To be associated with the value
-         * @param {*} value the value to be stored
-         * @param {*} duration the time to expire in seconds
-         */
-    async set(key, value, duration) {
-            await promisify(this.client.SETEX).bind(this.client)(key, duration, value);
-        }
-        /**
-         * delete the value associated with the given key
-         * @param {key} key To retrieve the value to be deleted
-         * @returns {void}
-         */
-    async del(key) {
-        await promisify(this.client.DEL).bind(this.client)(key);
+    async nbUsers() {
+        return this.client.db().collection("users").countDocuments();
+    }
+
+    /**
+     * Retrieves the number of files in the database.
+     * @returns {Promise<Number>}
+     */
+    async nbFiles() {
+        return this.client.db().collection("files").countDocuments();
+    }
+
+    /**
+     * Retrieves a reference to the `users` collection.
+     * @returns {Promise<Collection>}
+     */
+    async usersCollection() {
+        return this.client.db().collection("users");
+    }
+
+    /**
+     * Retrieves a reference to the `files` collection.
+     * @returns {Promise<Collection>}
+     */
+    async filesCollection() {
+        return this.client.db().collection("files");
     }
 }
-export const redisClient = new RedisClient();
-export default redisClient;
+
+export const dbClient = new DBClient();
+export default dbClient;
